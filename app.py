@@ -142,7 +142,7 @@ with tab2:
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
 
-        # --- render ALL messages in one HTML block so CSS layout works ---
+        # --- helper to build bubble HTML ---
         def _bubble(role, text):
             label = "You" if role == "user" else "Coach"
             cls = "user-bubble" if role == "user" else "coach-bubble"
@@ -158,30 +158,27 @@ with tab2:
                 f'</div>'
             )
 
-        bubbles = "".join(
-            _bubble(m["role"], m["content"])
-            for m in st.session_state["chat_history"]
-        )
-        st.markdown(
-            f'<div class="coach-chat-wrap">{bubbles}</div>',
-            unsafe_allow_html=True,
-        )
+        def _render_chat():
+            """Render all messages into the placeholder."""
+            html = "".join(
+                _bubble(m["role"], m["content"])
+                for m in st.session_state["chat_history"]
+            )
+            chat_area.markdown(
+                f'<div class="coach-chat-wrap">{html}</div>',
+                unsafe_allow_html=True,
+            )
+
+        # Single placeholder — updated in place so bubbles never duplicate
+        chat_area = st.empty()
+        _render_chat()
 
         # --- chat input (pinned to bottom via CSS) ---
         if prompt := st.chat_input("Ask your AI coach anything..."):
             st.session_state["chat_history"].append(
                 {"role": "user", "content": prompt}
             )
-
-            # Re-render all bubbles (including the new user msg) in one block
-            updated_bubbles = "".join(
-                _bubble(m["role"], m["content"])
-                for m in st.session_state["chat_history"]
-            )
-            st.markdown(
-                f'<div class="coach-chat-wrap">{updated_bubbles}</div>',
-                unsafe_allow_html=True,
-            )
+            _render_chat()  # show user bubble immediately
 
             profile = st.session_state.get("user_profile")
             week = st.session_state.get("week_plan")
