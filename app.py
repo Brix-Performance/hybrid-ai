@@ -4,7 +4,65 @@ from generator import build_week, save_plan_to_file
 from coach import explain_workout
 from ai_coach import get_api_key, build_system_prompt, chat
 
-st.set_page_config(page_title="Hybrix", page_icon="💪")
+st.set_page_config(page_title="Hybrix", page_icon="💪", layout="wide")
+
+# ---- Chat UI CSS ----
+st.markdown("""
+<style>
+/* ---------- chat bubble styles ---------- */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 70vh;
+    padding-bottom: 1rem;
+}
+.chat-row {
+    display: flex;
+    margin: 0.35rem 0;
+    max-width: 100%;
+}
+.chat-row.user {
+    justify-content: flex-end;
+}
+.chat-row.assistant {
+    justify-content: flex-start;
+}
+.chat-bubble {
+    padding: 0.65rem 1rem;
+    border-radius: 1rem;
+    max-width: 70%;
+    word-wrap: break-word;
+    line-height: 1.45;
+    font-size: 0.95rem;
+}
+.chat-row.user .chat-bubble {
+    background-color: #2563eb;
+    color: #fff;
+    border-bottom-right-radius: 0.25rem;
+}
+.chat-row.assistant .chat-bubble {
+    background-color: #374151;
+    color: #f3f4f6;
+    border-bottom-left-radius: 0.25rem;
+}
+.chat-label {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-bottom: 0.15rem;
+}
+.chat-row.user .chat-label {
+    text-align: right;
+}
+
+/* ---------- pin the chat input to the bottom ---------- */
+section[data-testid="stTabs"] [data-testid="stChatInput"] {
+    position: fixed;
+    bottom: 0;
+    z-index: 100;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("Hybrix 💪")
 st.write("Hybrid training plans for general hybrid athletes.")
@@ -73,15 +131,31 @@ with tab2:
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
 
-        # Display existing messages
-        for msg in st.session_state["chat_history"]:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+        def _render_bubble(role, text):
+            """Return HTML for a single chat bubble."""
+            label = "You" if role == "user" else "Coach"
+            safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+            return (
+                f'<div class="chat-row {role}">'
+                f'  <div>'
+                f'    <div class="chat-label">{label}</div>'
+                f'    <div class="chat-bubble">{safe}</div>'
+                f'  </div>'
+                f'</div>'
+            )
 
-        # Chat input
+        # Build the full chat HTML (messages grow upward from bottom)
+        bubbles_html = ""
+        for msg in st.session_state["chat_history"]:
+            bubbles_html += _render_bubble(msg["role"], msg["content"])
+
+        st.markdown(
+            f'<div class="chat-container">{bubbles_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Chat input (Streamlit pins this at bottom via our CSS)
         if prompt := st.chat_input("Ask your AI coach anything..."):
-            with st.chat_message("user"):
-                st.markdown(prompt)
             st.session_state["chat_history"].append(
                 {"role": "user", "content": prompt}
             )
@@ -94,15 +168,14 @@ with tab2:
             api_messages = [{"role": "system", "content": system_prompt}]
             api_messages.extend(st.session_state["chat_history"])
 
-            # Call AI and display response
-            with st.chat_message("assistant"):
-                with st.spinner("Coach is thinking... (free tier can take up to 2 min)"):
-                    try:
-                        reply = chat(api_key, api_messages)
-                    except Exception as e:
-                        reply = f"Sorry, I hit an error: {e}"
-                st.markdown(reply)
+            # Call AI and get response
+            with st.spinner("Coach is thinking..."):
+                try:
+                    reply = chat(api_key, api_messages)
+                except Exception as e:
+                    reply = f"Sorry, I hit an error: {e}"
 
             st.session_state["chat_history"].append(
                 {"role": "assistant", "content": reply}
             )
+            st.rerun()
