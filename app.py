@@ -29,8 +29,9 @@ st.markdown("""
     color: #ffffff;
     padding: 0.6rem 1rem;
     border-radius: 1rem 1rem 0.25rem 1rem;
-    max-width: 70%;
-    word-wrap: break-word;
+    max-width: 90%;
+    overflow-wrap: break-word;
+    word-break: normal;
     line-height: 1.45;
     font-size: 0.95rem;
 }
@@ -46,8 +47,9 @@ st.markdown("""
     color: #f3f4f6;
     padding: 0.6rem 1rem;
     border-radius: 1rem 1rem 1rem 0.25rem;
-    max-width: 70%;
-    word-wrap: break-word;
+    max-width: 90%;
+    overflow-wrap: break-word;
+    word-break: normal;
     line-height: 1.45;
     font-size: 0.95rem;
 }
