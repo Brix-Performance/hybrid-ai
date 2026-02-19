@@ -174,6 +174,20 @@ with tab2:
                 {"role": "user", "content": prompt}
             )
 
+            # Show the user bubble immediately so it's visible during the API call
+            safe_prompt = (prompt
+                           .replace("&", "&amp;")
+                           .replace("<", "&lt;")
+                           .replace(">", "&gt;")
+                           .replace("\n", "<br>"))
+            st.markdown(
+                f'<div class="user-bubble">'
+                f'  <div><div class="bubble-label">You</div>'
+                f'  <div class="bubble-inner">{safe_prompt}</div></div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
             profile = st.session_state.get("user_profile")
             week = st.session_state.get("week_plan")
             system_prompt = build_system_prompt(profile, week)
