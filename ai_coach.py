@@ -2,7 +2,7 @@ import os
 import streamlit as st
 import google.generativeai as genai
 
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-2.5-flash"
 
 
 def get_api_key():
