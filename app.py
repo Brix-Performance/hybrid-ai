@@ -4,62 +4,71 @@ from generator import build_week, save_plan_to_file
 from coach import explain_workout
 from ai_coach import get_api_key, build_system_prompt, chat
 
-st.set_page_config(page_title="Hybrix", page_icon="💪", layout="wide")
+st.set_page_config(page_title="Hybrix", page_icon="💪")
 
 # ---- Chat UI CSS ----
 st.markdown("""
 <style>
-/* ---------- chat bubble styles ---------- */
-.chat-container {
+/* ---- wrapper: push messages to the bottom ---- */
+.coach-chat-wrap {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     min-height: 70vh;
-    padding-bottom: 1rem;
+    padding-bottom: 4.5rem;          /* room for the fixed input bar */
 }
-.chat-row {
+
+/* ---- user messages: right-aligned, blue ---- */
+.user-bubble {
     display: flex;
-    margin: 0.35rem 0;
-    max-width: 100%;
-}
-.chat-row.user {
     justify-content: flex-end;
+    margin: 0.3rem 0;
 }
-.chat-row.assistant {
-    justify-content: flex-start;
-}
-.chat-bubble {
-    padding: 0.65rem 1rem;
-    border-radius: 1rem;
+.user-bubble .bubble-inner {
+    background-color: #2563eb;
+    color: #ffffff;
+    padding: 0.6rem 1rem;
+    border-radius: 1rem 1rem 0.25rem 1rem;
     max-width: 70%;
     word-wrap: break-word;
     line-height: 1.45;
     font-size: 0.95rem;
 }
-.chat-row.user .chat-bubble {
-    background-color: #2563eb;
-    color: #fff;
-    border-bottom-right-radius: 0.25rem;
+
+/* ---- coach messages: left-aligned, gray ---- */
+.coach-bubble {
+    display: flex;
+    justify-content: flex-start;
+    margin: 0.3rem 0;
 }
-.chat-row.assistant .chat-bubble {
+.coach-bubble .bubble-inner {
     background-color: #374151;
     color: #f3f4f6;
-    border-bottom-left-radius: 0.25rem;
-}
-.chat-label {
-    font-size: 0.7rem;
-    color: #9ca3af;
-    margin-bottom: 0.15rem;
-}
-.chat-row.user .chat-label {
-    text-align: right;
+    padding: 0.6rem 1rem;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+    max-width: 70%;
+    word-wrap: break-word;
+    line-height: 1.45;
+    font-size: 0.95rem;
 }
 
-/* ---------- pin the chat input to the bottom ---------- */
-section[data-testid="stTabs"] [data-testid="stChatInput"] {
-    position: fixed;
-    bottom: 0;
-    z-index: 100;
+.bubble-label {
+    font-size: 0.7rem;
+    color: #9ca3af;
+    margin-bottom: 0.1rem;
+}
+.user-bubble .bubble-label { text-align: right; }
+.coach-bubble .bubble-label { text-align: left; }
+
+/* ---- pin chat input to the bottom ---- */
+[data-testid="stChatInput"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 999;
+    background: var(--background-color, #0e1117);
+    padding: 0.5rem 1rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -131,36 +140,40 @@ with tab2:
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
 
-        def _render_bubble(role, text):
-            """Return HTML for a single chat bubble."""
-            label = "You" if role == "user" else "Coach"
-            safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-            return (
-                f'<div class="chat-row {role}">'
-                f'  <div>'
-                f'    <div class="chat-label">{label}</div>'
-                f'    <div class="chat-bubble">{safe}</div>'
-                f'  </div>'
-                f'</div>'
-            )
+        # --- render each message as its own HTML bubble ---
+        st.markdown('<div class="coach-chat-wrap">', unsafe_allow_html=True)
 
-        # Build the full chat HTML (messages grow upward from bottom)
-        bubbles_html = ""
         for msg in st.session_state["chat_history"]:
-            bubbles_html += _render_bubble(msg["role"], msg["content"])
+            safe = (msg["content"]
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\n", "<br>"))
+            if msg["role"] == "user":
+                st.markdown(
+                    f'<div class="user-bubble">'
+                    f'  <div><div class="bubble-label">You</div>'
+                    f'  <div class="bubble-inner">{safe}</div></div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="coach-bubble">'
+                    f'  <div><div class="bubble-label">Coach</div>'
+                    f'  <div class="bubble-inner">{safe}</div></div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
-        st.markdown(
-            f'<div class="chat-container">{bubbles_html}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # Chat input (Streamlit pins this at bottom via our CSS)
+        # --- chat input (pinned to bottom via CSS) ---
         if prompt := st.chat_input("Ask your AI coach anything..."):
             st.session_state["chat_history"].append(
                 {"role": "user", "content": prompt}
             )
 
-            # Build messages for API call
             profile = st.session_state.get("user_profile")
             week = st.session_state.get("week_plan")
             system_prompt = build_system_prompt(profile, week)
@@ -168,7 +181,6 @@ with tab2:
             api_messages = [{"role": "system", "content": system_prompt}]
             api_messages.extend(st.session_state["chat_history"])
 
-            # Call AI and get response
             with st.spinner("Coach is thinking..."):
                 try:
                     reply = chat(api_key, api_messages)
