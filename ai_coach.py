@@ -50,11 +50,12 @@ def build_system_prompt(profile=None, week_plan=None):
 
 def chat(api_key, messages):
     """Send messages to Kimi K2.5 and return the assistant reply."""
-    client = OpenAI(base_url=BASE_URL, api_key=api_key)
+    client = OpenAI(base_url=BASE_URL, api_key=api_key, timeout=120.0)
     response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
-        temperature=0.7,
+        temperature=0.6,
         max_tokens=1024,
+        extra_body={"thinking": {"type": "disabled"}},
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or "No response generated."

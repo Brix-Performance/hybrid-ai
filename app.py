@@ -96,7 +96,7 @@ with tab2:
 
             # Call AI and display response
             with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
+                with st.spinner("Coach is thinking... (free tier can take up to 2 min)"):
                     try:
                         reply = chat(api_key, api_messages)
                     except Exception as e:
