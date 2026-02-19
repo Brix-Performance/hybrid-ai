@@ -131,12 +131,12 @@ with tab1:
 with tab2:
     api_key = get_api_key()
 
-    if not api_key or api_key == "your-nvidia-nim-api-key-here":
+    if not api_key:
         st.warning(
-            "AI Coach is not configured yet. To enable it, add your free "
-            "NVIDIA NIM API key to `.streamlit/secrets.toml`:\n\n"
-            '```\nKIMI_API_KEY = "nvapi-your-key-here"\n```\n\n'
-            "Get a free key at https://build.nvidia.com/moonshotai/kimi-k2.5"
+            "AI Coach is not configured yet. Add your Gemini API key "
+            "to `.streamlit/secrets.toml`:\n\n"
+            '```\nGEMINI_API_KEY = "your-key-here"\n```\n\n'
+            "Get a key at https://aistudio.google.com/apikey"
         )
     else:
         if "chat_history" not in st.session_state:

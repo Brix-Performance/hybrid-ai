@@ -1,17 +1,16 @@
 import os
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 
-BASE_URL = "https://integrate.api.nvidia.com/v1"
-MODEL = "moonshotai/kimi-k2.5"
+MODEL = "gemini-2.0-flash"
 
 
 def get_api_key():
-    """Return the Kimi API key from secrets or env, or None."""
+    """Return the Gemini API key from secrets or env, or None."""
     try:
-        return st.secrets["KIMI_API_KEY"]
+        return st.secrets["GEMINI_API_KEY"]
     except (KeyError, FileNotFoundError):
-        return os.environ.get("KIMI_API_KEY")
+        return os.environ.get("GEMINI_API_KEY")
 
 
 def build_system_prompt(profile=None, week_plan=None):
@@ -49,13 +48,25 @@ def build_system_prompt(profile=None, week_plan=None):
 
 
 def chat(api_key, messages):
-    """Send messages to Kimi K2.5 and return the assistant reply."""
-    client = OpenAI(base_url=BASE_URL, api_key=api_key, timeout=120.0)
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        temperature=0.6,
-        max_tokens=1024,
-        extra_body={"thinking": {"type": "disabled"}},
+    """Send messages to Gemini and return the assistant reply."""
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(
+        model_name=MODEL,
+        system_instruction=next(
+            (m["content"] for m in messages if m["role"] == "system"), None
+        ),
     )
-    return response.choices[0].message.content or "No response generated."
+
+    # Convert messages to Gemini format (skip the system message)
+    history = []
+    for m in messages:
+        if m["role"] == "system":
+            continue
+        role = "user" if m["role"] == "user" else "model"
+        history.append({"role": role, "parts": [m["content"]]})
+
+    # The last message is the current user turn
+    current = history.pop()
+    chat_session = model.start_chat(history=history)
+    response = chat_session.send_message(current["parts"])
+    return response.text or "No response generated."
