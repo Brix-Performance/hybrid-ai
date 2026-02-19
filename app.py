@@ -142,33 +142,30 @@ with tab2:
         if "chat_history" not in st.session_state:
             st.session_state["chat_history"] = []
 
-        # --- render each message as its own HTML bubble ---
-        st.markdown('<div class="coach-chat-wrap">', unsafe_allow_html=True)
-
-        for msg in st.session_state["chat_history"]:
-            safe = (msg["content"]
+        # --- render ALL messages in one HTML block so CSS layout works ---
+        def _bubble(role, text):
+            label = "You" if role == "user" else "Coach"
+            cls = "user-bubble" if role == "user" else "coach-bubble"
+            safe = (text
                     .replace("&", "&amp;")
                     .replace("<", "&lt;")
                     .replace(">", "&gt;")
                     .replace("\n", "<br>"))
-            if msg["role"] == "user":
-                st.markdown(
-                    f'<div class="user-bubble">'
-                    f'  <div><div class="bubble-label">You</div>'
-                    f'  <div class="bubble-inner">{safe}</div></div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f'<div class="coach-bubble">'
-                    f'  <div><div class="bubble-label">Coach</div>'
-                    f'  <div class="bubble-inner">{safe}</div></div>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
+            return (
+                f'<div class="{cls}">'
+                f'<div><div class="bubble-label">{label}</div>'
+                f'<div class="bubble-inner">{safe}</div></div>'
+                f'</div>'
+            )
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        bubbles = "".join(
+            _bubble(m["role"], m["content"])
+            for m in st.session_state["chat_history"]
+        )
+        st.markdown(
+            f'<div class="coach-chat-wrap">{bubbles}</div>',
+            unsafe_allow_html=True,
+        )
 
         # --- chat input (pinned to bottom via CSS) ---
         if prompt := st.chat_input("Ask your AI coach anything..."):
@@ -176,17 +173,13 @@ with tab2:
                 {"role": "user", "content": prompt}
             )
 
-            # Show the user bubble immediately so it's visible during the API call
-            safe_prompt = (prompt
-                           .replace("&", "&amp;")
-                           .replace("<", "&lt;")
-                           .replace(">", "&gt;")
-                           .replace("\n", "<br>"))
+            # Re-render all bubbles (including the new user msg) in one block
+            updated_bubbles = "".join(
+                _bubble(m["role"], m["content"])
+                for m in st.session_state["chat_history"]
+            )
             st.markdown(
-                f'<div class="user-bubble">'
-                f'  <div><div class="bubble-label">You</div>'
-                f'  <div class="bubble-inner">{safe_prompt}</div></div>'
-                f'</div>',
+                f'<div class="coach-chat-wrap">{updated_bubbles}</div>',
                 unsafe_allow_html=True,
             )
 
