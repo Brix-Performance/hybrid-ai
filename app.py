@@ -433,25 +433,17 @@ def page_coach():
         )
         return
 
-    chat_area = st.empty()
-
-    def _render():
-        html = "".join(
-            _bubble(m["role"], m["content"])
-            for m in st.session_state["chat_history"]
-        )
-        chat_area.markdown(
-            f'<div class="coach-chat-wrap">{html}</div>',
-            unsafe_allow_html=True,
-        )
-
-    _render()
+    # Display chat history using native Streamlit chat messages
+    for msg in st.session_state["chat_history"]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
     if prompt := st.chat_input("Ask your AI coach anything..."):
         st.session_state["chat_history"].append(
             {"role": "user", "content": prompt}
         )
-        _render()
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
         profile = st.session_state.get("user_profile")
         week = st.session_state.get("week_plan")
@@ -460,16 +452,17 @@ def page_coach():
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend(st.session_state["chat_history"])
 
-        with st.spinner("Coach is thinking..."):
-            try:
-                reply = chat(api_key, api_messages)
-            except Exception as e:
-                reply = f"Sorry, I hit an error: {e}"
+        with st.chat_message("assistant"):
+            with st.spinner("Coach is thinking..."):
+                try:
+                    reply = chat(api_key, api_messages)
+                except Exception as e:
+                    reply = f"Sorry, I hit an error: {e}"
+            st.markdown(reply)
 
         st.session_state["chat_history"].append(
             {"role": "assistant", "content": reply}
         )
-        st.rerun()
 
 
 # ──────────────────────────────────────────
