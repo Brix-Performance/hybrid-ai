@@ -2,7 +2,8 @@ import datetime
 import streamlit as st
 from profile import (
     save_profile, get_profile, save_onboarding, is_onboarded,
-    log_workout, get_streaks,
+    log_workout, get_streaks, register_user, authenticate,
+    get_current_user, delete_all_users,
 )
 from generator import build_week, save_plan_to_file
 from coach import explain_workout
@@ -92,7 +93,7 @@ def _default(key, val):
     if key not in st.session_state:
         st.session_state[key] = val
 
-_default("page", "login")            # login | onboarding | home | coach | plan
+_default("page", "login")            # login | signup | onboarding | home | coach | plan
 _default("username", "")
 _default("onboard_step", 0)          # 0-4 for the onboarding questions
 _default("onboard_answers", {})
@@ -100,6 +101,13 @@ _default("onboard_messages", [])     # chat-style message list for onboarding
 _default("chat_history", [])
 _default("week_plan", None)
 _default("user_profile", None)
+
+# ── Auto-login: if a user exists on disk and session is fresh, restore them ──
+if st.session_state["page"] == "login" and not st.session_state["username"]:
+    saved_user, saved_profile = get_current_user()
+    if saved_user and saved_profile and saved_profile.get("onboarding_complete"):
+        st.session_state["username"] = saved_user
+        st.session_state["page"] = "home"
 
 
 # ──────────────────────────────────────────
@@ -160,23 +168,79 @@ def page_login():
     st.markdown("## Welcome to Hybrix 💪")
     st.write("Your personal hybrid training coach.")
     st.write("")
-    name = st.text_input("What's your name?", key="login_name_input")
-    if st.button("Let's go", type="primary"):
-        if not name.strip():
-            st.error("Please enter your name.")
-            return
-        clean = name.strip()
-        st.session_state["username"] = clean
-        if is_onboarded(clean):
-            _ensure_plan(clean)
-            st.session_state["page"] = "home"
-        else:
-            # Start onboarding
-            st.session_state["onboard_step"] = 0
-            st.session_state["onboard_answers"] = {}
-            st.session_state["onboard_messages"] = []
-            st.session_state["page"] = "onboarding"
+
+    # Check if an account already exists
+    existing_user, _ = get_current_user()
+
+    if existing_user:
+        # Account exists — show login form
+        st.markdown(f"**Account found:** {existing_user}")
+        password = st.text_input("Password", type="password", key="login_pw")
+        if st.button("Log in", type="primary"):
+            if authenticate(existing_user, password):
+                st.session_state["username"] = existing_user
+                if is_onboarded(existing_user):
+                    _ensure_plan(existing_user)
+                    st.session_state["page"] = "home"
+                else:
+                    st.session_state["onboard_step"] = 0
+                    st.session_state["onboard_answers"] = {}
+                    st.session_state["onboard_messages"] = []
+                    st.session_state["page"] = "onboarding"
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+        st.write("")
+        st.caption("Not you?")
+        if st.button("Create a new account"):
+            st.session_state["page"] = "signup"
+            st.rerun()
+    else:
+        # No account — redirect to signup
+        st.session_state["page"] = "signup"
         st.rerun()
+
+
+# ──────────────────────────────────────────
+# PAGE: Sign Up
+# ──────────────────────────────────────────
+def page_signup():
+    st.markdown("## Create your account 💪")
+    st.write("Set up your Hybrix profile to get started.")
+    st.write("")
+    name = st.text_input("Username", key="signup_name")
+    password = st.text_input("Password", type="password", key="signup_pw")
+    confirm = st.text_input("Confirm password", type="password", key="signup_confirm")
+
+    if st.button("Create account", type="primary"):
+        if not name.strip():
+            st.error("Please enter a username.")
+            return
+        if not password:
+            st.error("Please enter a password.")
+            return
+        if password != confirm:
+            st.error("Passwords don't match.")
+            return
+
+        clean = name.strip()
+        # Wipe any existing user and register the new one
+        register_user(clean, password)
+        st.session_state["username"] = clean
+        st.session_state["onboard_step"] = 0
+        st.session_state["onboard_answers"] = {}
+        st.session_state["onboard_messages"] = []
+        st.session_state["page"] = "onboarding"
+        st.rerun()
+
+    # If an account already exists, let them go back to login
+    existing_user, _ = get_current_user()
+    if existing_user:
+        st.write("")
+        st.caption("Already have an account?")
+        if st.button("Back to login"):
+            st.session_state["page"] = "login"
+            st.rerun()
 
 
 # ──────────────────────────────────────────
@@ -323,7 +387,8 @@ def page_home():
             st.session_state["page"] = "plan"
             st.rerun()
     with nav_cols[3]:
-        if st.button("🚪 Switch User"):
+        if st.button("🚪 Logout"):
+            delete_all_users()
             for k in list(st.session_state.keys()):
                 del st.session_state[k]
             st.rerun()
@@ -498,6 +563,8 @@ page = st.session_state["page"]
 
 if page == "login":
     page_login()
+elif page == "signup":
+    page_signup()
 elif page == "onboarding":
     page_onboarding()
 elif page == "home":

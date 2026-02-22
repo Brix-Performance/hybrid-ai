@@ -1,5 +1,7 @@
 import json
 import datetime
+import hashlib
+import os
 
 FILE = "users.json"
 
@@ -15,6 +17,50 @@ def load_users():
 def save_users(users):
     with open(FILE, "w") as f:
         json.dump(users, f, indent=2)
+
+
+def _hash_password(password, salt=None):
+    if salt is None:
+        salt = os.urandom(16).hex()
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
+    return salt, h.hex()
+
+
+def register_user(username, password):
+    """Register a new user, wiping any existing users (single-user mode)."""
+    salt, pw_hash = _hash_password(password)
+    users = {
+        username: {
+            "password_hash": pw_hash,
+            "salt": salt,
+        }
+    }
+    save_users(users)
+
+
+def authenticate(username, password):
+    """Return True if username exists and password matches."""
+    users = load_users()
+    user = users.get(username)
+    if not user:
+        return False
+    salt = user.get("salt", "")
+    _, pw_hash = _hash_password(password, salt)
+    return pw_hash == user.get("password_hash", "")
+
+
+def get_current_user():
+    """Return (username, profile) for the single registered user, or (None, None)."""
+    users = load_users()
+    if not users:
+        return None, None
+    username = next(iter(users))
+    return username, users[username]
+
+
+def delete_all_users():
+    """Wipe the entire userbase (used on logout)."""
+    save_users({})
 
 
 def save_profile(name, level, days):
