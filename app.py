@@ -257,13 +257,21 @@ FITNESS_LEVEL_MAP = {
     "Competitive athlete": "elite",
 }
 
-# Map days answers → int
-DAYS_MAP = {
-    "I don't really train right now": 3,
-    "1–2 days": 3,
+# Map current-training answers → int (informational only)
+CURRENT_DAYS_MAP = {
+    "I don't really train right now": 0,
+    "1–2 days": 2,
     "3–4 days": 4,
     "5–6 days": 5,
-    "Every day": 6,
+    "Every day": 7,
+}
+
+# Map target-days answers → int (used for plan generation)
+TARGET_DAYS_MAP = {
+    "3 days": 3,
+    "4 days": 4,
+    "5 days": 5,
+    "6 days": 6,
 }
 
 ONBOARD_QUESTIONS = [
@@ -284,7 +292,7 @@ ONBOARD_QUESTIONS = [
             "Nice to meet you, {display_name}! "
             "How many days per week do you currently train?"
         ),
-        "key": "days",
+        "key": "current_days",
         "input_type": "buttons_and_text",
         "options": [
             "I don't really train right now",
@@ -297,7 +305,7 @@ ONBOARD_QUESTIONS = [
     },
     {
         "coach_msg": (
-            "Got it. Last one — how would you describe your "
+            "Got it. How would you describe your "
             "current fitness level?"
         ),
         "key": "fitness_level",
@@ -318,29 +326,70 @@ ONBOARD_QUESTIONS = [
         ],
         "placeholder": "Or describe it in your own words...",
     },
+    {
+        "coach_msg": (
+            "Now let's talk about your goals. "
+            "How many days per week do you want to train on this program?"
+        ),
+        "key": "target_days",
+        "input_type": "buttons_and_text",
+        "options": [
+            "3 days",
+            "4 days",
+            "5 days",
+            "6 days",
+        ],
+        "placeholder": "Or type a number...",
+    },
+    {
+        "coach_msg": (
+            "What's your main goal for training?"
+        ),
+        "key": "goal",
+        "input_type": "buttons_and_text",
+        "options": [
+            "Lose weight / get leaner",
+            "Build muscle / get stronger",
+            "Improve endurance / cardio",
+            "Train for a specific event or competition",
+            "General health and fitness",
+        ],
+        "placeholder": "Or describe your goal...",
+    },
+    {
+        "coach_msg": (
+            "Last one — how many weeks do you want this program to run? "
+            "I can build anything from 1 to 8 weeks."
+        ),
+        "key": "duration_weeks",
+        "input_type": "buttons_and_text",
+        "options": [
+            "2 weeks",
+            "4 weeks",
+            "6 weeks",
+            "8 weeks",
+        ],
+        "placeholder": "Or type a number of weeks (1–8)...",
+    },
 ]
 
 
-def _parse_days_answer(answer):
-    """Extract training days (int) from a days answer."""
-    if answer in DAYS_MAP:
-        return DAYS_MAP[answer]
-    # Try to pull a number from a custom answer
+def _parse_int_answer(answer, mapping, lo, hi, default):
+    """Extract an int from a preset mapping or custom text."""
+    if answer in mapping:
+        return mapping[answer]
     import re
     nums = re.findall(r'\d+', answer)
     if nums:
-        d = int(nums[-1])
-        return max(3, min(6, d))
-    return 4  # sensible default
+        return max(lo, min(hi, int(nums[-1])))
+    return default
 
 
 def _parse_fitness_answer(answer):
     """Map fitness answer to a generator level string."""
-    # Check for exact match first
     for label, level in FITNESS_LEVEL_MAP.items():
         if label.lower() in answer.lower():
             return level
-    # Keyword heuristics for custom text
     low = answer.lower()
     if any(w in low for w in ("couch", "never", "new", "starting", "beginner", "none")):
         return "beginner"
@@ -384,8 +433,17 @@ def page_onboarding():
         def _submit_answer(answer_text):
             messages.append({"role": "user", "content": answer_text})
             key = q["key"]
-            if key == "days":
-                answers[key] = _parse_days_answer(answer_text)
+            if key == "current_days":
+                answers[key] = _parse_int_answer(
+                    answer_text, CURRENT_DAYS_MAP, 0, 7, 3)
+            elif key == "target_days":
+                val = _parse_int_answer(
+                    answer_text, TARGET_DAYS_MAP, 3, 6, 4)
+                answers[key] = val
+                answers["days"] = val  # used by plan generator
+            elif key == "duration_weeks":
+                answers[key] = _parse_int_answer(
+                    answer_text, {}, 1, 8, 4)
             elif key == "fitness_level":
                 answers[key] = answer_text
                 answers["level"] = _parse_fitness_answer(answer_text)
@@ -500,13 +558,16 @@ def page_home():
 
     # ---- Profile summary ----
     if profile:
-        info_cols = st.columns(3)
+        info_cols = st.columns(4)
         with info_cols[0]:
             st.markdown(f"**Days/week:** {profile.get('days', '—')}")
         with info_cols[1]:
             st.markdown(f"**Fitness Level:** {profile.get('fitness_level', '—')}")
         with info_cols[2]:
-            st.markdown(f"**Program Level:** {profile.get('level', '—').title()}")
+            st.markdown(f"**Goal:** {profile.get('goal', '—')}")
+        with info_cols[3]:
+            duration = profile.get('duration_weeks', '—')
+            st.markdown(f"**Program:** {duration} weeks")
 
     st.divider()
 

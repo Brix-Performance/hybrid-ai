@@ -78,18 +78,18 @@ def get_profile(name):
 
 
 def save_onboarding(name, data):
-    """Save onboarding answers and mark onboarding as complete.
-
-    data should contain: display_name, days, fitness_level, level
-    """
+    """Save onboarding answers and mark onboarding as complete."""
     users = load_users()
     if name not in users:
         users[name] = {}
     users[name]["onboarding_complete"] = True
     users[name]["display_name"] = data.get("display_name", name)
+    users[name]["current_days"] = data.get("current_days", 0)
     users[name]["days"] = data.get("days", 5)
     users[name]["fitness_level"] = data.get("fitness_level", "")
     users[name]["level"] = data.get("level", "intermediate")
+    users[name]["goal"] = data.get("goal", "General health and fitness")
+    users[name]["duration_weeks"] = data.get("duration_weeks", 4)
     users[name]["program_start"] = datetime.date.today().isoformat()
 
     # Initialize tracking if not present
